@@ -1,0 +1,173 @@
+﻿@using SportTracker.Mappings.Questions;
+@using SportTracker.Services;
+@using SportTracker.Mappings.Questions.Create;
+@using SportTracker.Mappings.Questions.Update;
+
+@inject QuestionService questionService
+
+<h3>Questions:</h3>
+
+@if (questions != null && questions.Questions.Any())
+{
+    for (int i = 0; i < questions.Questions.Count; i++)
+    {
+        int counter = i;
+        @if (!edit)
+        {
+            <div class="form-row">
+                <div class="col-md-4 mb-1">
+                    <button style="width: 200px; height: 50px;" @onclick="() => { show = !show; selectedId = counter; }">@questions.Questions[counter].Name</button>
+                    @if (!show)
+                    {
+                        <button class="btn btn-primary" @onclick="() => { edit = true; selectedId = counter; LoadEditingData(questions.Questions[counter].Id);  }">Edit</button>
+                        <button class="btn btn-delete" @onclick="async () => { await Delete(questions.Questions[counter].Id); }">Delete</button>
+                    }
+                </div>
+            </div>
+        }
+        @if (edit && selectedId == counter)
+        {
+            <div class="form-row">
+                <div class="col-md-4 mb-1">
+                    <label>Question</label>
+                    <div class="form-row">
+                        <input type="text" @bind-value="update.Name" />
+                        <button class="btn btn-primary" @onclick="async () => await EditQuestion(questions.Questions[counter].Id)">Save</button>
+                        <button class="btn btn-secondary" @onclick="() => { edit = !edit; update = new UpdateQuestionCommand(); }">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (!edit && selectedId == counter)
+        {
+            if (show && depth <= 2)
+            {
+                <div style="margin: 20px;">
+                    <Answer questionId="questions.Questions[counter].Id" questionnaireId="questionnaireId.Value" depth="depth" />
+                </div>
+            }
+        }
+    }
+}
+
+@if (create)
+{
+    <div class="form-row">
+        <div class="col-md-4 mb-1">
+            <div class="form-row">
+                <input type="text" placeholder="question" @bind="insert.Name" />
+                <button class="btn btn-primary" @onclick="InsertQuestion">Save</button>
+                <button class="btn btn-secondary" @onclick="() => { create = !create; }">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+else if (!edit)
+{
+    if (depth < 3)
+    {
+        <button @onclick="() => { create = !create; }">Insert Question</button>
+    }
+}
+
+@code {
+    [Parameter] public int? questionnaireId { get; set; }
+    [Parameter] public int? answerId { get; set; }
+    [Parameter] public int depth { get; set; }
+    QuestionListViewModel questions;
+    CreateQuestionCommand insert = new CreateQuestionCommand();
+    UpdateQuestionCommand update = new UpdateQuestionCommand();
+    bool create, show, edit;
+    int? selectedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadQuestions();
+    }
+
+    protected async Task LoadQuestions()
+    {
+        if (answerId.HasValue)
+        {
+            questions = await questionService.GetQuestionsAsync(null, answerId.Value);
+        }
+        else if (questionnaireId.HasValue)
+        {
+            questions = await questionService.GetQuestionsAsync(questionnaireId.Value, null);
+        }
+    }
+
+    protected async Task GetQuestionById(int id)
+    {
+        var question = await questionService.GetQuestionAsync(id);
+
+        if (question != null && questions != null)
+        {
+            questions.Questions.Add(question);
+            StateHasChanged();
+        }
+    }
+
+    protected async Task InsertQuestion()
+    {
+        if (insert != null && !string.IsNullOrEmpty(insert.Name) && questionnaireId.HasValue)
+        {
+            insert.QuestionnaireId = questionnaireId.Value;
+            insert.QuestionNumber = questions.Questions.Count + 1;
+            insert.AnswerId = answerId;
+            insert.Depth = depth;
+
+            var id = await questionService.InsertQuestionAsync(insert);
+
+            if (id != 0)
+            {
+                create = false;
+                insert = new CreateQuestionCommand();
+                await GetQuestionById(id);
+            }
+        }
+    }
+
+    protected async Task EditQuestion(int id)
+    {
+        if (update != null)
+        {
+            await questionService.UpdateQuestionAsync(update);
+
+            edit = false;
+            update = new UpdateQuestionCommand();
+
+            var question = await questionService.GetQuestionAsync(id);
+
+            if (question != null)
+            {
+                var index = questions.Questions.FindIndex(e => e.Id == id);
+                questions.Questions[index] = question;
+                StateHasChanged();
+            }
+        }
+    }
+
+    protected void LoadEditingData(int id)
+    {
+        var question = questions.Questions.FirstOrDefault(e => e.Id == id);
+
+        if (question != null)
+        {
+            update.Id = question.Id;
+            update.Name = question.Name;
+            //update.QuestionNumber = question;
+        }
+    }
+
+    protected async Task Delete(int id)
+    {
+        if (id != 0)
+        {
+            await questionService.DeleteQuestionAsync(id);
+
+            questions.Questions.Remove(questions.Questions.FirstOrDefault(e => e.Id == id));
+            StateHasChanged();
+        }
+    }
+}

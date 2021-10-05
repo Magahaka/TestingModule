@@ -1,0 +1,133 @@
+﻿@using SistemuPagrindai.Services.EmailService;
+@using SportTracker.Services
+@using SportTracker.Mappings.DefaultQuestion;
+@using SportTracker.Mappings.SportPlans;
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http;
+@using Microsoft.AspNetCore.Identity;
+@using SportTracker.Areas.Identity.Data;
+@using System.Linq;
+
+@using Microsoft.Extensions.Options
+@using Microsoft.Extensions.Logging
+@inject SportPlanService sportPlanService
+@inject IEmailSender emailSender
+@inject IHttpContextAccessor HttpContextAccessor
+@inject UserManager<AspNetUser> userManager
+
+@inject IUserStore<AspNetUser> store
+@inject IOptions<IdentityOptions> options
+@inject IPasswordHasher<AspNetUser> passwordHasher
+@inject IEnumerable<IUserValidator<AspNetUser>> userValidator
+@inject IEnumerable<IPasswordValidator<AspNetUser>> passwordValidator
+@inject ILookupNormalizer normalizer
+@inject IdentityErrorDescriber errorDescriber
+@inject IServiceProvider serviceProvider
+@inject ILogger<UserManager<AspNetUser>> logger
+
+<div >
+    Pasirinkote planą: @toShowMessage<br>
+</div>
+
+<div hidden="@toShow">
+    @if (sportPlans != null)
+    {
+        sportPlans.SportPlans.Sort((x, y) => Math.Abs(x.DifficultyLevel - (int)(PointCount)) - Math.Abs(y.DifficultyLevel - (int)(PointCount)));
+
+        @for (int i = 0; i < sportPlans.SportPlans.Count; i++)
+        {
+            int counter = i;
+            @if (sportPlans.SportPlans[counter].Gender == int.Parse(DefaultQuestions[0].Answer))
+            {
+                int difference = Math.Abs(sportPlans.SportPlans[counter].CaloriesPerWeek - int.Parse(DefaultQuestions[1].Answer));
+                @if (difference < 2500)
+                {
+                    @if ((int)sportPlans.SportPlans[counter].SportZones == int.Parse(DefaultQuestions[2].Answer))
+                    {
+                        @if (sportPlans.SportPlans[counter].NumberOfSportsDays == int.Parse(DefaultQuestions[3].Answer))
+                        {
+                            
+                            <div>
+                                <button class="btn btn-primary" @onclick="() => ConfirmPlan(sportPlans.SportPlans[counter].Id, sportPlans.SportPlans[counter].Name) ">
+                                    Name: @sportPlans.SportPlans[counter].Name <br>
+                                    Description: @sportPlans.SportPlans[counter].Description <br>
+                                    Calories per week: @sportPlans.SportPlans[counter].CaloriesPerWeek <br>
+                                    Difficulty level: @sportPlans.SportPlans[counter].DifficultyLevel <br>
+                                </button>
+                                <br>
+                            </div>
+                        }
+                    }
+                }
+            }
+        }
+    }
+</div>
+<div>
+    <button @onclick="async () => await SendMessage()">Siusti zinute anketos kurejui</button>
+    <button @onclick="async () => await ChoosePlan()">Pasirinkti Plana</button>
+</div>
+
+@code {
+    [Parameter] public List<DefaultQuestionViewModel> DefaultQuestions { get; set; }
+    [Parameter] public double PointCount { get; set; }
+    [Parameter] public string SurveyCreatorId { get; set; }
+    string userId;
+    AspNetUser creator;
+    SportPlanListViewModel sportPlans;
+    int planId;
+    bool toShow = true;
+    string toShowMessage = "-";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await loadUser();
+        await LoadSurveyCreator();
+        await load();
+
+    }
+
+    protected async Task load()
+    {
+        sportPlans = await sportPlanService.GetPlansAsync();
+    }
+
+    protected async Task ChoosePlan()
+    {
+        toShow = false;
+    }
+
+    protected async Task ConfirmPlan(int id, string name)
+    {
+        toShowMessage = name;
+        userManager = new UserManager<AspNetUser>(store, options, passwordHasher, userValidator, passwordValidator, normalizer, errorDescriber, serviceProvider, logger);
+        var user = await userManager.FindByIdAsync(userId);
+        user.SportPlanId = id;
+        var result = await userManager.UpdateAsync(user);
+    }
+
+    protected async Task SendMessage()
+    {
+        if (creator != null)
+        {
+            var message = new Message(new string[] { creator.Email }, "xdddddddddddddddddd", "bandom testuojam vaziuojam", null);
+            await emailSender.SendEmailAsync(message, true);
+        }
+    }
+
+    protected async Task LoadSurveyCreator()
+    {
+        creator = await userManager.FindByIdAsync(SurveyCreatorId);
+    }
+
+    protected async Task loadUser()
+    {
+        userId = loadUserInformation();
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+}

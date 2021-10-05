@@ -1,0 +1,182 @@
+﻿@page "/workoutform"
+@using SportTracker.Mappings.Workouts
+@using SportTracker.Mappings.Workouts.Update
+@using SportTracker.Mappings.Workouts.Create
+@using SportTracker.Services
+
+@inject WorkoutService workoutService
+
+@if (formType == "Edit")
+{
+    <div class="simple-form">
+        <EditForm Model="@workout" OnValidSubmit="@Edit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group">
+                <label>Name</label>
+                <InputText class="form-control" @bind-Value="@workout.Name" />
+            </div>
+
+            <div class="form-group">
+                <label>Start Time</label>
+                <InputDate TValue="DateTime?" class="form-control" @bind-Value="@workout.StartDateTime"></InputDate>
+            </div>
+
+            <div class="form-group">
+                <label>End Time</label>
+                <InputDate TValue="DateTime?" class="form-control" @bind-Value="@workout.EndDateTime"></InputDate>
+            </div>
+
+            <div class="form-group">
+                <label>Duration</label>
+                <InputNumber TValue="double?" class="form-control" @bind-Value="@workout.Duration" />
+            </div>
+
+            <div class="form-group">
+                <label>Avg. Heart Rate</label>
+                <InputNumber TValue="double?" class="form-control" @bind-Value="@workout.AverageHeartRate" />
+            </div>
+
+            <div class="form-group">
+                <label>Avg. Speed</label>
+                <InputNumber TValue="double?" class="form-control" @bind-Value="@workout.AverageSpeed" />
+            </div>
+
+            <div class="form-group">
+                <label>Burned Calories</label>
+                <InputNumber TValue="double?" class="form-control" @bind-Value="@workout.BurnedCalories" />
+            </div>
+
+            <div class="form-group">
+                <label for="status">Description</label>
+                <InputText class="form-control" @bind-Value="@workout.Description" />
+            </div>
+
+            <div class="form-group">
+                <label>Distance</label>
+                <InputNumber TValue="double?" class="form-control" @bind-Value="@workout.Distance" />
+            </div>
+
+            <div class="form-group">
+                <button type="submit" value="Submit" class="btn btn-primary">Submit</button>
+            </div>
+        </EditForm>
+
+        <button @onclick="async() => await BlazoredModal.CancelAsync()" class="btn btn-secondary">Cancel</button>
+    </div>
+}
+@if (formType == "Add")
+{
+<div class="simple-form">
+    <EditForm Model="@workoutCreate" OnValidSubmit="@Create">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label>Name</label>
+            <InputText class="form-control" @bind-Value="@workoutCreate.Name" />
+        </div>
+
+        <div class="form-group">
+            <label>Start Time</label>
+            <InputDate TValue="DateTime?" class="form-control" @bind-Value="@workoutCreate.StartDateTime"></InputDate>
+        </div>
+
+        <div class="form-group">
+            <label>End Time</label>
+            <InputDate TValue="DateTime?" class="form-control" @bind-Value="@workoutCreate.EndDateTime"></InputDate>
+        </div>
+
+        <div class="form-group">
+            <label>Duration</label>
+            <InputNumber TValue="double?" class="form-control" @bind-Value="@workoutCreate.Duration" />
+        </div>
+
+        <div class="form-group">
+            <label>Avg. Heart Rate</label>
+            <InputNumber TValue="double?" class="form-control" @bind-Value="@workoutCreate.AverageHeartRate" />
+        </div>
+
+        <div class="form-group">
+            <label>Avg. Speed</label>
+            <InputNumber TValue="double?" class="form-control" @bind-Value="@workoutCreate.AverageSpeed" />
+        </div>
+
+        <div class="form-group">
+            <label>Burned Calories</label>
+            <InputNumber TValue="double?" class="form-control" @bind-Value="@workoutCreate.BurnedCalories" />
+        </div>
+
+        <div class="form-group">
+            <label for="status">Description</label>
+            <InputText class="form-control" @bind-Value="@workoutCreate.Description" />
+        </div>
+
+        <div class="form-group">
+            <label>Distance</label>
+            <InputNumber TValue="double?" class="form-control" @bind-Value="@workoutCreate.Distance" />
+        </div>
+
+        <div class="form-group">
+            <button type="submit" value="Submit" class="btn btn-primary">Submit</button>
+        </div>
+    </EditForm>
+
+    <button @onclick="async() => await BlazoredModal.CancelAsync()" class="btn btn-secondary">Cancel</button>
+</div>
+}
+@code {
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; }
+    [Parameter] public WorkoutViewModel workout { get; set; }
+    [Parameter] public int workoutId { get; set; }
+    [Parameter] public string userId { get; set; }
+    [Parameter] public string formType { get; set; }
+    public WorkoutViewModel workoutCreate = new WorkoutViewModel();
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    public async Task Edit()
+    {
+        UpdateWorkoutCommand update = new UpdateWorkoutCommand()
+        {
+            Id = workoutId,
+            Name = workout.Name,
+            StartDateTime = workout.StartDateTime,
+            EndDateTime = workout.EndDateTime,
+            Duration = workout.Duration,
+            AverageHeartRate = workout.AverageHeartRate,
+            AverageSpeed = workout.AverageSpeed,
+            BurnedCalories = workout.BurnedCalories,
+            Description = workout.Description,
+            Distance = workout.Distance,
+        };
+
+        await workoutService.UpdateWorkoutAsync(update);
+
+        await BlazoredModal.CloseAsync(ModalResult.Ok("Updated successfully"));
+    }
+    public async Task Create()
+    {
+        CreateWorkoutCommand create = new CreateWorkoutCommand()
+        {
+            Name = workoutCreate.Name,
+            StartDateTime = workoutCreate.StartDateTime,
+            EndDateTime = workoutCreate.EndDateTime,
+            Duration = workoutCreate.Duration,
+            AverageHeartRate = workoutCreate.AverageHeartRate,
+            AverageSpeed = workoutCreate.AverageSpeed,
+            BurnedCalories = workoutCreate.BurnedCalories,
+            Description = workoutCreate.Description,
+            Distance = workoutCreate.Distance,
+            UserId = userId
+        };
+
+        var id = await workoutService.InsertWorkoutAsync(create);
+
+        await BlazoredModal.CloseAsync(ModalResult.Ok<int>(id));
+    }
+}

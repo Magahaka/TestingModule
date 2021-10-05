@@ -1,0 +1,110 @@
+﻿@using SportTracker.Mappings.Questionnaires;
+@using System.Reflection;
+@using SportTracker.Mappings.Questionnaires.Create;
+@using SportTracker.Services;
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http;
+@using SportTracker.Mappings.Questionnaires.Update;
+@using SportTracker.Pages.Questionnaires;
+@using SportTracker.Mappings.QuestionnaireQuestion;
+@using SportTracker.Mappings.Questions;
+@using SportTracker.Mappings.Answers;
+
+@inject NavigationManager navManager
+@inject QuestionnaireService questionnaireService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject QuestionnaireQuestionService questionnaireQuestionService
+@inject QuestionService questionService
+
+@if (data != null)
+{
+    for (int i = 0; i < data.Count; i++)
+    {
+        int counter = i;
+        <div class="form-row">
+            <div class="col-md-4 mb-1">
+                <div class="form-row">
+                    @if (selectedId.HasValue && selectedId.Value != counter)
+                    {
+                        <button class="btn btn-primary" style="width: 200px; height: 50px;" disabled></button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary" style="width: 200px; height: 50px;" @onclick="async () =>
+                                                                                                      {
+                                                                                                          if (selectedId.HasValue)
+                                                                                                          {
+                                                                                                              show = !show;
+                                                                                                          }
+                                                                                                          else
+                                                                                                          {
+                                                                                                              show = !show;
+                                                                                                              await Sum(selectedId != counter ? data[counter].Points : data[counter].Points * (-1));
+                                                                                                              await Answer(counter);
+                                                                                                              selectedId = counter;
+                                                                                                          }
+                                                                                                          
+                                                                                                      }">@data[counter].Name
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+        if (show && data[counter].AnswerQuestions != null && selectedId == counter)
+        {
+            <div style="margin: 20px;">
+                <SurveyQuestions data="data[counter].AnswerQuestions" sumSelectedAnswerPoints="async (args) => { await Sum((double)args); }" answeredQuestion="async (args) => { await Answered((bool)args); }"/>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public List<AnswerViewModel> data { get; set; }
+    [Parameter] public EventCallback<double> sumSelectedAnswerPoints { get; set; }
+    [Parameter] public EventCallback<bool> answeredQuestion { get; set; }
+    string userId;
+    bool show;
+    int? selectedId;
+    bool isDisabled;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await loadUser();
+        await load();
+    }
+
+    protected async Task load()
+    {
+    }
+
+    protected async Task loadUser()
+    {
+        userId = loadUserInformation();
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    protected async Task Sum(double points)
+    {
+        await sumSelectedAnswerPoints.InvokeAsync(points);
+    }
+
+    protected async Task Answered(bool args)
+    {
+        await answeredQuestion.InvokeAsync(args);
+    }
+
+    protected async Task Answer(int counter)
+    {
+        if (data[counter].AnswerQuestions?.Any() == false || data[counter].AnswerQuestions == null)
+        {
+            await answeredQuestion.InvokeAsync(true);
+        }
+    }
+}

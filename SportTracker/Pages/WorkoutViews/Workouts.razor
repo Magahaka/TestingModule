@@ -1,0 +1,128 @@
+﻿@page "/workout"
+@using SportTracker.Services
+@using SportTracker.Mappings.Workouts
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http; 
+@inject IHttpContextAccessor HttpContextAccessor
+@inject WorkoutService workoutService
+@inject IJSRuntime JsRuntime
+
+<h1>Your Workouts</h1>
+
+<p style="font-weight: bold">
+    <button @onclick="@(async () => { await Create(); })" class="btn btn-primary">Create Workout</button>
+</p>
+@if (workouts != null)
+{
+    <div>
+        <table id="customers">
+            <tr>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Duration</th>
+                <th>Avg. Heart Rate</th>
+                <th>Avg. Speed</th>
+                <th>Burned Calories</th>
+                <th>Description</th>
+                <th>Distance</th>
+                <th></th>
+                <th></th>
+            </tr>
+            @foreach (var item in workouts.Workouts)
+            {
+                <tr>
+                    <td>@item.StartDateTime?.ToString("yyyy-MM-dd")</td>
+                    <td>@item.EndDateTime?.ToString("yyyy-MM-dd")</td>
+                    <td>@(item.Duration.HasValue ? TimeSpan.FromSeconds(item.Duration.Value) : string.Empty)</td>
+                    <td>@(item.AverageHeartRate.HasValue ? item.AverageHeartRate : string.Empty)</td>
+                    <td>@(item.AverageSpeed.HasValue ? item.AverageSpeed : string.Empty)</td>
+                    <td>@(item.BurnedCalories.HasValue ? item.BurnedCalories : string.Empty)</td>
+                    <td>@(string.IsNullOrEmpty(item.Description) ? string.Empty : item.Description)</td>
+                    <td>@(item.Distance.HasValue ? item.Distance : string.Empty)</td>
+                    <td><button @onclick="@(() => Edit(item.Id))" class="btn btn-primary">Edit</button></td>
+                    <td><button @onclick="@(() => Delete(item.Id))" class="btn btn-danger">Delete</button></td>
+                </tr>
+            }
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter] public IModalService Modal { get; set; }
+    public WorkoutListViewModel workouts;
+    public WorkoutViewModel workout;
+    string userId;
+    public string formType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await load();
+
+    }
+
+    protected async Task load()
+    {
+        userId = loadUserInformation();
+        if (!string.IsNullOrEmpty(userId))
+        {
+            workouts = await workoutService.GetWorkoutsAsync(userId);
+            workout = await workoutService.GetWorkoutAsync(19);
+        }
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    protected async Task Create()
+    {
+        formType = "Add";
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(WorkoutForm.userId), userId);
+        parameters.Add(nameof(WorkoutForm.formType), formType);
+
+        var modal = Modal.Show<WorkoutForm>("Create Workout", parameters);
+        var result = await modal.Result;
+
+        if (!result.Cancelled)
+        {
+            if ((int)result.Data != 0)
+            {
+                await load();
+                StateHasChanged();
+            }
+        }
+    }
+
+    protected async Task Edit(int id)
+    {
+        formType = "Edit";
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(WorkoutForm.workoutId), id);
+        parameters.Add(nameof(WorkoutForm.workout), workouts.Workouts.FirstOrDefault(e => e.Id == id));
+        parameters.Add(nameof(WorkoutForm.formType), formType);
+
+        var modal = Modal.Show<WorkoutForm>("Edit Workout", parameters);
+        var result = await modal.Result;
+
+        if (!result.Cancelled)
+        {
+            await load();
+            StateHasChanged();
+        }
+    }
+
+    protected async Task Delete(int id)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            await workoutService.DeleteWorkoutAsync(id);
+
+            workouts.Workouts.Remove(workouts.Workouts.FirstOrDefault(e => e.Id == id));
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,104 @@
+﻿@page "/import"
+
+@using NPOI.SS.UserModel;
+@using NPOI.HSSF.UserModel;
+@using NPOI.XSSF.UserModel;
+@using System.IO;
+@using BlazorInputFile;
+@using SportTracker.Mappings.Workouts;
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http;
+
+@inject NavigationManager navManager
+@inject IHttpContextAccessor HttpContextAccessor
+
+<label class="button" for="file-material-upload">Import</label>
+<div style="display: none;">
+    <BlazorInputFile.InputFile multiple OnChange="ImportFile" id="file-material-upload" />
+</div>
+
+@if (workout != null)
+{
+    <ImportedData workout="workout" OnCancel="Cancel" userId="@userId" />
+}
+
+@code {
+    public ImportViewModel workout;
+    public string userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await load();
+    }
+
+    protected async Task load()
+    {
+        userId = loadUserInformation();
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    protected void Cancel(bool args)
+    {
+        workout = null;
+    }
+
+    protected async Task ImportFile(IFileListEntry[] files)
+    {
+        try
+        {
+            foreach (var file in files)
+            {
+                var stream = new MemoryStream();
+                await file.Data.CopyToAsync(stream, 4096);
+                string sFileExtension = Path.GetExtension(file.Name).ToLower();
+                ISheet sheet;
+                var bom = new byte[4096];
+                stream.Seek(0, SeekOrigin.Begin);
+                if (sFileExtension == ".xls")
+                {
+                    HSSFWorkbook hssfwb = new HSSFWorkbook(stream); //This will read the Excel 97-2000 formats
+                    sheet = hssfwb.GetSheetAt(0); //get first sheet from workbook
+                }
+                else if (sFileExtension == ".xlsx")
+                {
+                    XSSFWorkbook hssfwb = new XSSFWorkbook(stream); //This will read 2007 Excel format
+                    sheet = hssfwb.GetSheetAt(0); //get first sheet from workbook
+                }
+                else
+                {
+                    continue;
+                }
+                IRow headerRow = sheet.GetRow(0); //Get Header Row
+                int cellCount = headerRow.LastCellNum;
+
+                workout = new ImportViewModel();
+
+                var row = sheet.GetRow(1);
+                workout.Name = row.GetCell(0, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString();
+                workout.Sport = row.GetCell(1, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString();
+                workout.Date = DateTime.ParseExact(row.GetCell(2, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString(), "dd-MM-yyyy", null);
+                var value = TimeSpan.Parse(row.GetCell(3, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString()).Ticks;
+                workout.StartTime = workout.Date.Value.Add(TimeSpan.FromTicks(value));
+                workout.Duration = Convert.ToDouble(TimeSpan.Parse(row.GetCell(4, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString()).TotalMinutes);
+                workout.TotalDistance = Convert.ToDouble(row.GetCell(5, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.AverageHeartRate = Convert.ToDouble(row.GetCell(6, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.AverageSpeed = Convert.ToDouble(row.GetCell(7, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.MaxSpeed = Convert.ToDouble(row.GetCell(8, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.Calories = Convert.ToDouble(row.GetCell(11, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.TrainingLoad = Convert.ToDouble(row.GetCell(16, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.Ascent = Convert.ToDouble(row.GetCell(17, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.Descent = Convert.ToDouble(row.GetCell(18, MissingCellPolicy.RETURN_NULL_AND_BLANK)?.ToString());
+                workout.EndTime = workout.StartTime.Value.AddMinutes(workout.Duration);
+            }
+        }
+        catch (Exception e)
+        {
+            throw;
+        }
+    }
+}

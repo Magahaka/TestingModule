@@ -1,0 +1,184 @@
+﻿@page "/SurveyChoiceForm/{id:int}"
+@using SportTracker.Mappings.Questionnaires;
+@using System.Reflection;
+@using SportTracker.Mappings.Questionnaires.Create;
+@using SportTracker.Services;
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http;
+@using SportTracker.Mappings.DefaultQuestion;
+@using SportTracker.Pages.Questionnaires;
+@using SportTracker.Mappings.QuestionnaireQuestion;
+@using SportTracker.Mappings.Questions;
+
+@inject NavigationManager navManager
+@inject QuestionnaireService questionnaireService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject QuestionnaireQuestionService questionnaireQuestionService
+@inject QuestionService questionService
+
+<h3>SurveyForm</h3>
+
+@if (questionnaire != null)
+{
+    <h2>@questionnaire.Name</h2>
+
+    @for (int i = 0; i < basicQuestions.Count; i++)
+    {
+        int counter = i;
+        <div class="form-row">
+            <div class="col-md-4 mb-1">
+                <label>Question</label>
+                <div class="form-row">
+                    <p>@(basicQuestions[counter].Question)</p>
+                    <input type="text" @oninput="@((e) => { basicQuestions[counter].Answer=(string)e.Value;})" />
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (questionnaire.Questions != null)
+    {
+        @for (int i = 0; i < questionnaire.Questions.Count; i++)
+        {
+            int counter = i;
+            <div class="form-row">
+                <div class="col-md-4 mb-1">
+                    <label>Question</label>
+                    <div class="form-row">
+                        <button class="btn btn-primary" @onclick="() => { show = !show; }">@(questionnaire.Questions[counter].Question)</button>
+                    </div>
+                </div>
+            </div>
+            if (show)
+            {
+                <div style="margin: 20px;">
+                    <SurveyAnswers data="questionnaire.Questions[counter].Answers" sumSelectedAnswerPoints="(args) => Sum((double)args)" answeredQuestion="Answered" />
+                </div>
+            }
+        }
+
+        <div>
+            @sumofPoints
+        </div>
+
+        @if (questionCount <= 0)
+        {
+            <div>
+                Tasku skaicius:
+                <button @onclick="async () => await NavigateToPlanChoice()">Submit</button>
+            </div>
+        }
+    }
+}
+
+@code {
+        [CascadingParameter] public IModalService Modal { get; set; }
+        [Parameter] public QuestionnaireViewModel questionnaire { get; set; }
+        [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; }
+        [Parameter] public int id { get; set; }
+        public QuestionnaireQuestionListViewModel questionnaireQuestions;
+    public QuestionListViewModel questions;
+    string userId;
+    bool show;
+    double sumofPoints = 0;
+    int questionCount;
+
+    public List<DefaultQuestionViewModel> basicQuestions = new List<DefaultQuestionViewModel>();
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await loadUser();
+        await load();
+        QuestionCountInSurvey();
+        LoadQuestions();
+    }
+
+    protected void LoadQuestions()
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            DefaultQuestionViewModel basicQuestion = new DefaultQuestionViewModel();
+            basicQuestions.Add(basicQuestion);
+        }
+        basicQuestions[0].Question = "Gender(write a number Male - 1, Female - 0)";
+        basicQuestions[1].Question = "How many calories do you eat per week?";
+        basicQuestions[2].Question = "Sport zones(write a number Health Maitenance - 1, Weight management - 2, Endurance - 3, Inactive - 4, Full power - 5)";
+        basicQuestions[3].Question = "Workouts per week(write a number betweeen 1-7)";
+    }
+
+    protected void QuestionCountInSurvey()
+    {
+        if (questionnaire != null)
+        {
+            if (questionnaire.Questions != null)
+            {
+                foreach (var question in questionnaire.Questions)
+                {
+                    if (question.Answers != null)
+                    {
+                        foreach (var answer in question.Answers)
+                        {
+                            if (answer.AnswerQuestions != null)
+                            {
+                                questionCount += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    protected async Task load()
+    {
+        questionnaire = await questionnaireService.GetQuestionnaireAsync(id);
+        questionnaire.Questions = questionnaire.Questions.Where(e => e.Depth <= 1).ToList();
+    }
+
+    protected async Task loadUser()
+    {
+        userId = loadUserInformation();
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    protected void Sum(double points)
+    {
+        sumofPoints += points;
+    }
+
+    protected void Answered(bool args)
+    {
+        if (args)
+        {
+            questionCount -= 1;
+        }
+    }
+
+    protected async Task NavigateToPlanChoice()
+    {
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(PlanChoice.PointCount), sumofPoints);
+        parameters.Add(nameof(PlanChoice.SurveyCreatorId), questionnaire.UserId);
+        parameters.Add(nameof(PlanChoice.DefaultQuestions), basicQuestions);
+
+        var modal = Modal.Show<PlanChoice>("Plan Choice", parameters);
+        var result = await modal.Result;
+
+        if (!result.Cancelled)
+        {
+            if ((int)result.Data != 0)
+            {
+                await load();
+                StateHasChanged();
+            }
+        }
+    }
+
+}

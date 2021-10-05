@@ -1,0 +1,452 @@
+﻿@page "/calendar"
+@using SportTracker.Services
+@using SportTracker.Mappings.Workouts
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http;
+@using SportTracker.Pages.WorkoutViews
+@using SportTracker.Helpers.CalendarItems
+@using SportTracker.Mappings.SportPlans
+@using Microsoft.AspNetCore.Identity;
+@using SportTracker.Areas.Identity.Data;
+
+
+@using Microsoft.Extensions.Options
+@using Microsoft.Extensions.Logging
+
+@inject IHttpContextAccessor HttpContextAccessor
+@inject WorkoutService workoutService
+@inject PlanWorkoutService planWorkoutService
+@inject SportPlanService sportPlanService
+@inject IJSRuntime JsRuntime
+
+
+@inject IUserStore<AspNetUser> store
+@inject IOptions<IdentityOptions> options
+@inject IPasswordHasher<AspNetUser> passwordHasher
+@inject IEnumerable<IUserValidator<AspNetUser>> userValidator
+@inject IEnumerable<IPasswordValidator<AspNetUser>> passwordValidator
+@inject ILookupNormalizer normalizer
+@inject IdentityErrorDescriber errorDescriber
+@inject IServiceProvider serviceProvider
+@inject ILogger<UserManager<AspNetUser>> logger
+
+<style type="text/css">
+    #tblparent tbody tr td {
+        width: 200px;
+        height: 200px;
+    }
+
+    #divParent {
+        position: relative;
+    }
+
+    #divModal {
+        z-index: 10;
+        position: absolute;
+        border: 1px solid #000000;
+        border-radius: 3px;
+        background-color: #ffffff;
+        left: 40%;
+        top: 20%;
+        width: 400px;
+        min-height: 300px;
+    }
+
+    .modalHeading {
+        text-align: center;
+        font-size: 50px;
+        text-decoration: underline;
+        margin-bottom: 36px;
+    }
+</style>
+
+<h1>Calendar</h1>
+
+@if (displayModal)
+{
+    <div id="divModal">
+        <div class="container">
+            <div class="panel panel-default">
+                <div class="panel-heading modalHeading">Set Note</div>
+                <div class="panel-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label>From Date : </label>
+                        </div>
+                        <div class="col-md-8">
+                            <input type="date" style="width:100%;" />
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label>To Date : </label>
+                    </div>
+                    <div class="col-md-8">
+                        <input type="date" style="width:100%;" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label>Note : </label>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" placeholder="Type here..." />
+                    </div>
+                </div>
+                <div class="row" style="margin-bottom:10px;">
+                    <div class="col-md-6">
+                    </div>
+                    <div class="col-md-6" style="text-align:right;">
+                        <button class="btn btn-success" style="float:left;margin-right:5px;">Save</button>
+                        <button class="btn btn-danger" @onclick="CloseModal" style="float:left;">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<select @onchange="LoadCalendarYears">
+    @foreach (string monthName in yearNames)
+    {
+        <option>@monthName</option>
+    }
+</select>
+
+<select @onchange="LoadCalendar">
+    @foreach (string monthName in monthNames)
+    {
+        <option>@monthName</option>
+    }
+</select>
+
+@if (usr != null)
+{
+    if (usr.SportPlanId == null)
+    {
+        <p style="color:red">You don't have a sports plan</p>
+    }
+}
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            @for (var dayIndex = 0; dayIndex < days.Count(); dayIndex++)
+            {
+                <th>
+                    @days[dayIndex]
+                </th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @for (var weekIndex = 0; weekIndex < weeks.Count(); weekIndex++)
+        {
+            double distance = 0;
+            double duration = 0;
+            double burnedCalories = 0;
+            double plannedDistance = 0;
+            <tr>
+                @for (var dayIndex = 0; dayIndex < weeks[weekIndex].Dates.Count(); dayIndex++)
+                {
+                    var wIndex = weekIndex;
+                    var dIndex = dayIndex;
+
+                    WorkoutViewModel wrkt = new WorkoutViewModel();
+                    PlanWorkoutViewModel planned = new PlanWorkoutViewModel();
+
+                    @if (workouts != null)
+                    {
+                        @foreach (var item in workouts.Workouts)
+                        {
+
+                            DateTime cmp = DateTime.Parse(weeks[weekIndex].Dates[dayIndex].DateValue);
+                            var dd = cmp.ToString("d");
+                            var dd2 = item.StartDateTime?.ToString("d");
+                            if (dd == dd2)
+                            {
+                                wrkt = item;
+                                distance += (double)(wrkt.Distance);
+                                duration += (double)(wrkt.Duration);
+                                burnedCalories += (double)(wrkt.BurnedCalories);
+                            }
+                        }
+                    }
+
+                    string ids = "";
+                    string Duration = "";
+                    string HeartRate = "";
+                    string Speed = "";
+                    string Calories = "";
+                    string Distance = "";
+
+                    ids = wrkt.Id.ToString();
+                    Duration = wrkt.Duration.ToString();
+                    HeartRate = wrkt.AverageHeartRate.ToString();
+                    Speed = wrkt.AverageSpeed.ToString();
+                    Calories = wrkt.BurnedCalories.ToString();
+                    Distance = wrkt.Distance.ToString();
+                    @if (wrkt.Id != 0)
+                    {
+                        <td @ondblclick="@(() => Edit(wrkt.Id))">
+                            @weeks[weekIndex].Dates[dayIndex].DateValue
+                            <br /><br />
+
+                            <label style="color:#c00;font-weight:bold">@weeks[weekIndex].Dates[dayIndex].Note</label>
+
+                            @if (planWorkouts != null)
+                            {
+                                @foreach (var item in planWorkouts.PlanWorkouts)
+                                {
+                                    planned = item;
+                                    @if (dIndex == (int)(planned.WeekDay) + 1)
+                                    {
+                                        <p style="color: #c00; font-weight: bold">Planned workout</p>
+                                        <p>Description: @planned.Description</p>
+                                        <p>Distance: @planned.PlannedDistance</p>
+                                        plannedDistance += planned.PlannedDistance;
+                                    }
+                                }
+                            }
+
+                            <p style="color: #c00; font-weight: bold">Finished workout</p>
+                            <p>Duration: @TimeSpan.FromSeconds((double)(wrkt.Duration))</p>
+                            <p>Avg HR: @HeartRate</p>
+                            <p>Avg. Speed: @Speed</p>
+                            <p>Calories: @Calories</p>
+                            <p>Distance: @Distance</p>
+
+                        </td>
+                    }
+                    @if (wrkt.Id == 0)
+                    {
+                        @if (planWorkouts != null)
+                        {
+                            bool ok = true;
+                            @foreach (var item in planWorkouts.PlanWorkouts)
+                            {
+                                planned = item;
+
+                                @if (dIndex == (int)(planned.WeekDay) + 1)
+                                {
+                                    <td @ondblclick="@(() => Create())">
+                                        @weeks[weekIndex].Dates[dayIndex].DateValue
+                                        <br /><br />
+
+                                        <label style="color:#c00;font-weight:bold">@weeks[weekIndex].Dates[dayIndex].Note</label>
+                                        <p style="color: #c00; font-weight: bold">Planned workout</p>
+                                        <p>Description: @planned.Description</p>
+                                        <p>Distance: @planned.PlannedDistance</p>
+                                    </td>
+                                    ok = false;
+                                    plannedDistance += planned.PlannedDistance;
+                                }
+                            }
+                            @if (ok)
+                            {
+                                <td>
+                                    @weeks[weekIndex].Dates[dayIndex].DateValue
+                                    <br /><br />
+                                    <label style="color:#c00;font-weight:bold">@weeks[weekIndex].Dates[dayIndex].Note</label>
+                                </td>
+
+                            }
+                        }
+
+                    }
+                }
+                <td>
+                    <br /><br />
+
+                    <label style="color:#c00;font-weight:bold">Statistics:</label>
+
+                    <p>Distance: @distance</p>
+                    <p>Duration: @TimeSpan.FromSeconds(duration)</p>
+                    <p>Calories: @burnedCalories</p>
+
+                    <label style="color:#c00;font-weight:bold">Goals:</label>
+
+                    <p>Distance: @plannedDistance</p>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code{
+    bool displayModal = false;
+    List<string> monthNames = new List<string>();
+    List<string> yearNames = new List<string>();
+    List<string> days = new List<string>();
+    List<WeekClass> weeks = new List<WeekClass>();
+    DateTime startDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+    DateTime endDate = (new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1)).AddMonths(1).AddDays(-1);
+    public WorkoutListViewModel workouts;
+    string userId;
+    int mIndex = DateTime.Now.Month, yIndex = DateTime.Now.Year;
+    [CascadingParameter] public IModalService Modal { get; set; }
+    public string formType;
+    private UserManager<AspNetUser> userManager;
+    public int planId;
+    public SportPlanViewModel sportPlan;
+    public PlanWorkoutListViewModel planWorkouts;
+    public AspNetUser usr;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await load();
+        monthNames = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.MonthGenitiveNames.ToList();
+        for (int i = 2015; i <= DateTime.Now.Year; i++)
+        {
+            yearNames.Add(i.ToString());
+        }
+        GenerateCalendarHead();
+        GenerateCalendarBody();
+    }
+
+    protected async Task load()
+    {
+        userId = loadUserInformation();
+        userManager = new UserManager<AspNetUser>(store, options, passwordHasher, userValidator, passwordValidator, normalizer, errorDescriber, serviceProvider, logger);
+        var user = await userManager.FindByIdAsync(userId);
+        usr = user;
+        //var user = HttpContextAccessor.HttpContext.User;
+        if (!string.IsNullOrEmpty(userId))
+        {
+            workouts = await workoutService.GetWorkoutsAsync(userId);
+            if (user.SportPlanId != null)
+            {
+                planId = user.SportPlanId.Value;
+                planWorkouts = await planWorkoutService.GetPlanWorkoutsAsync(planId);
+                sportPlan = await sportPlanService.GetPlanAsync(planId);
+            }
+        }
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    private void LoadCalendar(ChangeEventArgs e)
+    {
+        var month = e.Value.ToString();
+        int monthIndex = DateTime.ParseExact(month, "MMMM", System.Globalization.CultureInfo.CreateSpecificCulture("en-GB")).Month;
+        mIndex = monthIndex;
+        startDate = new DateTime(yIndex, monthIndex, 1);
+        endDate = (new DateTime(yIndex, monthIndex, 1)).AddMonths(1).AddDays(-1);
+        GenerateCalendarHead();
+        GenerateCalendarBody();
+    }
+
+    private void LoadCalendarYears(ChangeEventArgs e)
+    {
+        var year = e.Value.ToString();
+        int yearIndex = DateTime.ParseExact(year, "yyyy", System.Globalization.CultureInfo.CreateSpecificCulture("en-GB")).Year;
+        yIndex = yearIndex;
+        startDate = new DateTime(yearIndex, mIndex, 1);
+        endDate = (new DateTime(yearIndex, mIndex, 1)).AddMonths(1).AddDays(-1);
+        GenerateCalendarHead();
+        GenerateCalendarBody();
+    }
+
+    private void GenerateCalendarHead()
+    {
+        var day1 = new List<string>();
+        for (var dt = startDate; dt <= endDate; dt = dt.AddDays(1))
+        {
+            day1.Add(dt.ToString("dddd"));
+        }
+        days = day1.Distinct().ToList();
+    }
+
+    private void GenerateCalendarBody()
+    {
+        weeks = new List<WeekClass>();
+
+        int flag = 0;
+        WeekClass week = new WeekClass();
+        List<DayEvent> dates = new List<DayEvent>();
+        endDate = (new DateTime(yIndex, mIndex, 1)).AddMonths(1).AddDays(-1);
+        startDate = new DateTime(yIndex, mIndex, 1);
+        var totalDays = (int)(endDate - startDate).TotalDays;
+        int countDays = 0;
+
+        for (var dt = startDate; dt <= endDate; dt = dt.AddDays(1))
+        {
+            flag++;
+            dates.Add(new DayEvent()
+            {
+                DateValue = dt.ToString("dd-MMM-yyyy"),
+                DayName = dt.ToString("dddd")
+            });
+
+            if (flag == 7)
+            {
+                week = new WeekClass();
+                week.Dates = dates;
+                weeks.Add(week);
+
+                dates = new List<DayEvent>();
+                flag = 0;
+            }
+            if (countDays == totalDays)
+            {
+                week = new WeekClass();
+                week.Dates = dates;
+                weeks.Add(week);
+                break;
+            }
+            countDays++;
+        }
+    }
+
+    private void CloseModal()
+    {
+        displayModal = false;
+    }
+
+    private void OpenModal(int wIndex, int dIndex)
+    {
+        displayModal = true;
+    }
+    protected async Task Edit(int id)
+    {
+        formType = "Edit";
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(WorkoutForm.workoutId), id);
+        parameters.Add(nameof(WorkoutForm.workout), workouts.Workouts.FirstOrDefault(e => e.Id == id));
+        parameters.Add(nameof(WorkoutForm.formType), formType);
+
+        var modal = Modal.Show<WorkoutForm>("Edit Workout", parameters);
+        var result = await modal.Result;
+
+        if (!result.Cancelled)
+        {
+            await load();
+            StateHasChanged();
+        }
+    }
+    protected async Task Create()
+    {
+        formType = "Add";
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(WorkoutForm.userId), userId);
+        parameters.Add(nameof(WorkoutForm.formType), formType);
+
+        var modal = Modal.Show<WorkoutForm>("Create Workout", parameters);
+        var result = await modal.Result;
+
+        if (!result.Cancelled)
+        {
+            if ((int)result.Data != 0)
+            {
+                await load();
+                StateHasChanged();
+            }
+        }
+    }
+}
+

@@ -1,0 +1,139 @@
+﻿@page "/questionnaireform"
+
+@inject NavigationManager navManager
+@inject IJSRuntime JsRuntime
+@inject QuestionnaireService questionnaireService
+@inject IHttpContextAccessor HttpContextAccessor
+
+@using SportTracker.Mappings.Questionnaires;
+@using System.Reflection;
+@using SportTracker.Mappings.Questionnaires.Create;
+@using SportTracker.Services;
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http;
+@using SportTracker.Mappings.Questionnaires.Update;
+
+<h3>Questionnaire:</h3>
+
+@if (!questionnaireId.HasValue)
+{
+    <div>
+        <button @onclick="() => { create = true; }">Create Questionnaire</button>
+    </div>
+
+    @if (create)
+    {
+        <div class="form-row">
+            <div class="col-md-4 mb-1">
+                <label>Survey Name</label>
+                <div class="form-row">
+                    <input type="text" @bind-value="name" />
+                    <button class="btn btn-secondary" @onclick="InsertQuestionnaire">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+else if (questionnaire != null)
+{
+    @if (!edit)
+    {
+        <div class="form-row">
+            <div class="col-md-4 mb-1">
+                <button style="width: 200px; height: 50px;" @onclick="() => { show = !show; }">@questionnaire.Name</button>
+                @if (!show)
+                {
+                    <button class="btn btn-secondary" @onclick="() => { edit = true; }">Edit</button>
+                }
+            </div>
+        </div>
+        @if (show)
+        {
+            <div style="margin: 20px;">
+                <Question questionnaireId="questionnaire.Id" depth="1" />
+            </div>
+        }
+    }
+    @if (edit)
+    {
+        <div class="form-row">
+            <div class="col-md-4 mb-1">
+                <label>Questionnaire Name</label>
+                <div class="form-row">
+                    <input type="text" @bind-value="questionnaire.Name" />
+                    <button class="btn btn-secondary" @onclick="EditQuestionnaire">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+
+@code {
+    [Parameter] public int? questionnaireId { get; set; }
+    QuestionnaireViewModel questionnaire;
+    string userId, name;
+    bool create, edit, show;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (questionnaireId.HasValue)
+        {
+            await LoadQuestionnaire();
+        }
+        await load();
+    }
+
+    protected async Task InsertQuestionnaire()
+    {
+        if (!string.IsNullOrEmpty(name))
+        {
+            CreateQuestionnaireCommand insert = new CreateQuestionnaireCommand()
+            {
+                Name = name,
+                UserId = userId
+            };
+
+            questionnaireId = await questionnaireService.InsertQuestionnaireAsync(insert);
+
+            create = false;
+
+            await LoadQuestionnaire();
+        }
+        if (!questionnaireId.HasValue)
+        {
+            navManager.NavigateTo("/questionnaires");
+        }
+    }
+
+    protected async Task EditQuestionnaire()
+    {
+        UpdateQuestionnaireCommand update = new UpdateQuestionnaireCommand()
+        {
+            Id = questionnaire.Id,
+            Name = questionnaire.Name
+        };
+
+        await questionnaireService.UpdateQuestionnaireAsync(update);
+
+        edit = false;
+
+        await LoadQuestionnaire();
+    }
+
+    protected async Task LoadQuestionnaire()
+    {
+        questionnaire = await questionnaireService.GetQuestionnaireAsync(questionnaireId.Value);
+    }
+
+    protected async Task load()
+    {
+        userId = loadUserInformation();
+    }
+
+    protected string loadUserInformation()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        return principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+}

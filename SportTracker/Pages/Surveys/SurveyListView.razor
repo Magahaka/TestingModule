@@ -1,0 +1,58 @@
+﻿@page "/surveys"
+
+@inject NavigationManager navManager
+@inject QuestionnaireService questionnaireService
+@inject IHttpContextAccessor HttpContextAccessor
+
+@using SportTracker.Mappings.Questionnaires;
+@using System.Reflection;
+@using SportTracker.Mappings.Questionnaires.Create;
+@using SportTracker.Services;
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http;
+
+<h3>Surveys</h3>
+
+@if (questionnaires != null && questionnaires.Questionnaires.Any())
+{
+    for (int i = 0; i < questionnaires.Questionnaires.Count; i++)
+    {
+        int counter = i;
+        <div>
+            <a href="/SurveyChoiceForm/@questionnaires.Questionnaires[counter].Id.ToString()">
+                <button style="width: 200px; height: 50px">@questionnaires.Questionnaires[counter].Name</button>
+            </a>
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter] public IModalService Modal { get; set; }
+    QuestionnaireListViewModel questionnaires;
+    int id;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await load();
+    }
+
+    protected async Task load()
+    {
+        questionnaires = await questionnaireService.GetQuestionnairesAsync(string.Empty, true);
+    }
+
+    protected async Task NavigateToSurveyForm(int id)
+    {
+        //var parameters = new ModalParameters();
+        //parameters.Add(nameof(SurveyChoiceForm.Id), id);
+        //var modal = Modal.Show<SurveyChoiceForm>("Open survey", parameters);
+        //var result = await modal.Result;
+
+        //if (!result.Cancelled)
+        //{
+        //    await load();
+        //    StateHasChanged();
+        //}
+        navManager.NavigateTo("/SurveyChoiceForm/" + id);
+    }
+}

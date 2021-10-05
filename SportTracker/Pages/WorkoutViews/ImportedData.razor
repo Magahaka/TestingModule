@@ -1,0 +1,255 @@
+﻿@page "/importedworkout/{workout}"
+
+@using SportTracker.Mappings.Workouts
+@using SportTracker.Mappings.Workouts.Create
+@using SportTracker.Services
+
+@inject WorkoutService workoutService
+@inject NavigationManager navManager
+
+@if (workout != null)
+{
+    <EditForm Model="@workout" OnValidSubmit="@OnValidSubmit">
+        <DataAnnotationsValidator />
+        <div class="form-row">
+            <div class="col-md-4 mb-1">
+                <label>Name</label>
+                <div>
+                    <InputText @bind-Value="@workout.Name" class="form-control" />
+                    <ValidationMessage For="@(() => workout.Name)" />
+                </div>
+            </div>
+        </div>
+
+        @*<div class="form-group ">
+                <div>
+                    <label>Sport :</label>
+                    <div>
+                        <InputSelect @bind-Value="@workout.Sport" class="form-control col-sm-3">
+                            <option value="Select">--Select--</option>
+                            <option value="Cycling">CYCLING</option>
+                            <option value="Running">RUNNING</option>
+                            <option value="Other">Other</option>
+                        </InputSelect>
+                        <ValidationMessage For="@(() => workout.Sport)" />
+                    </div>
+                </div>
+            </div>
+            <div class="form-group ">
+                <div>
+                    <label>Date :</label>
+                    <div>
+                        <InputDate @bind-Value="@workout.Date" class="form-control col-sm-3" />
+                        <ValidationMessage For="@(() => workout.Date)" />
+                    </div>
+                </div>
+            </div>
+            <div class="form-group ">
+                <div>
+                    <label>StartTime</label>
+                    <div>
+                        <InputDate @bind-Value="@workout.StartTime" class="form-control col-sm-3" />
+                        <ValidationMessage For="@(() => workout.StartTime)" />
+                    </div>
+                </div>
+            </div>*@
+
+        <div class="form-row">
+            <div class="col-md-2 mb-2">
+                <label>Start Time</label>
+                <div class="input-group input-group mb-2">
+                    <RadzenDatePicker TValue="DateTime?" Value="@workout.StartTime" ShowTime="true" ShowSeconds="true" DateFormat="dd-MM-yyyy HH:mm:ss"
+                                      Style="outline: none;" ValueChanged="(args) => {
+                                                                           if (workout.StartTime < workout.EndTime)
+                                                                           {
+                                                                               workout.StartTime = args;
+                                                                               workout.Duration = workout.EndTime.Value.Subtract(workout.StartTime.Value).TotalMinutes;
+                                                                           }
+                                                                           else
+                                                                           {
+                                                                               workout.StartTime = workout.EndTime;
+                                                                               workout.Duration = 0;
+                                                                           }
+                                                                       }" />
+                </div>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label>End Time</label>
+                <div class="input-group input-group mb-2">
+                    <RadzenDatePicker TValue="DateTime?" Value="@workout.EndTime" ShowTime="true" ShowSeconds="true" DateFormat="dd-MM-yyyy HH:mm:ss"
+                                      Style="outline: none;" ValueChanged="(args) => {
+                                                                           if (workout.EndTime > workout.EndTime)
+                                                                           {
+                                                                               workout.EndTime = args;
+                                                                               workout.Duration = workout.EndTime.Value.Subtract(workout.StartTime.Value).TotalMinutes;
+                                                                           }
+                                                                           else
+                                                                           {
+                                                                               workout.EndTime = workout.StartTime;
+                                                                               workout.Duration = 0;
+                                                                           }
+                                                                       }" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-2 mb-2">
+                <label>Duration</label>
+                <div class="input-group input-group mb-2">
+                    @{
+                        TimeSpan t = TimeSpan.FromMinutes(workout.Duration);
+                        string time = string.Format("{0:D2}.{1:D2}:{2:D2}:{3:D2}", t.Days, t.Hours, t.Minutes, t.Seconds);
+                    }
+                    <input class="form-control" type="text" value="@time" disabled />
+                </div>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label>TotalDistance</label>
+                <div class="input-group input-group mb-2">
+                    <InputNumber @bind-Value="@workout.TotalDistance" class="form-control" />
+                    <ValidationMessage For="@(() => workout.TotalDistance)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">km</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-2 mb-2">
+                <label>AverageSpeed</label>
+                <div class="input-group input-group mb-2">
+                    <InputNumber @bind-Value="@workout.AverageSpeed" class="form-control" />
+                    <ValidationMessage For="@(() => workout.AverageSpeed)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">km/h</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label>MaxSpeed</label>
+                <div class="input-group input-group mb-3">
+                    <InputNumber @bind-Value="@workout.MaxSpeed" class="form-control" />
+                    <ValidationMessage For="@(() => workout.MaxSpeed)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">km/h</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-2 mb-2">
+                <label>Calories</label>
+                <div class="input-group input-group mb-3">
+                    <InputNumber @bind-Value="@workout.Calories" class="form-control" />
+                    <ValidationMessage For="@(() => workout.Calories)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">kcal</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label>TrainingLoad</label>
+                <div class="input-group input-group mb-3">
+                    <InputNumber @bind-Value="@workout.TrainingLoad" class="form-control" />
+                    <ValidationMessage For="@(() => workout.TrainingLoad)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">TSS</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-2 mb-2">
+                <label>Ascent</label>
+                <div class="input-group input-group mb-3">
+                    <InputNumber @bind-Value="@workout.Ascent" class="form-control" />
+                    <ValidationMessage For="@(() => workout.Ascent)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">m</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label>Descent</label>
+                <div class="input-group input-group mb-3">
+                    <InputNumber @bind-Value="@workout.Descent" class="form-control" />
+                    <ValidationMessage For="@(() => workout.Descent)" />
+                    <div class="input-group-append">
+                        <span class="input-group-text">m</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-4">
+                <label>Description</label>
+                <div class="input-group input-group mb-3">
+                    <textarea class="form-control" @bind="@workout.Description" />
+                </div>
+            </div>
+        </div>
+
+        <div style="display: inline">
+            <p style="font-weight: bold">
+                <button @onclick="@Save" class="btn btn-primary">Save</button>
+                <button @onclick="@Cancel" class="btn btn-secondary">Cancel</button>
+            </p>
+        </div>
+
+    </EditForm>
+}
+
+@code {
+    [Parameter] public ImportViewModel workout { get; set; }
+    [Parameter] public EventCallback<bool> OnCancel { get; set; }
+    [Parameter] public string userId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var a = 10;
+    }
+
+    protected void OnValidSubmit()
+    {
+
+    }
+
+    protected async Task HandleInput(ChangeEventArgs args)
+    {
+        workout.Description = args.Value.ToString();
+    }
+
+    protected async Task Save()
+    {
+        if (workout != null)
+        {
+            CreateWorkoutCommand create = new CreateWorkoutCommand()
+            {
+                Name = workout.Name,
+                StartDateTime = workout.StartTime,
+                EndDateTime = workout.EndTime,
+                Duration = workout.Duration,
+                AverageHeartRate = workout.AverageHeartRate,
+                AverageSpeed = workout.AverageSpeed,
+                BurnedCalories = workout.Calories,
+                Description = workout.Description,
+                Distance = workout.TotalDistance,
+                UserId = userId
+            };
+
+            var id = await workoutService.InsertWorkoutAsync(create);
+
+            navManager.NavigateTo("/workout");
+        }
+    }
+
+    protected async Task Cancel()
+    {
+        await OnCancel.InvokeAsync(true);
+    }
+}

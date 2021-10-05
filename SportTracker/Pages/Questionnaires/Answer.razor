@@ -1,0 +1,150 @@
+﻿@using SportTracker.Mappings.Answers;
+@using SportTracker.Services;
+@using SportTracker.Mappings.Answers.Create;
+@using SportTracker.Mappings.Answers.Update;
+
+@inject AnswerService answerService
+
+<h3>Answers:</h3>
+
+@if (answers != null && answers.Answers.Any())
+{
+    for (int i = 0; i < answers.Answers.Count; i++)
+    {
+        int counter = i;
+        @if (!edit)
+        {
+            <div class="form-row">
+                <div class="col-md-4 mb-1">
+                    <button style="width: 200px; height: 50px;" @onclick="() => { show = !show; selectedId = counter; }">@answers.Answers[counter].Name</button>
+                    <button style="width: 100px; height: 50px;">Points: @answers.Answers[counter].Points</button>
+                    @if (!show)
+                    {
+                        <button class="btn btn-primary" @onclick="() => { edit = true; selectedId = counter; LoadEditingData(answers.Answers[counter].Id); }">Edit</button>
+                        <button class="btn btn-delete" @onclick="async () => { await Delete(answers.Answers[counter].Id); }">Delete</button>
+                    }
+                </div>
+            </div>
+        }
+        @if (edit && selectedId == counter)
+        {
+            <div class="form-row">
+                <div class="col-md-4 mb-1">
+                    <label>Question</label>
+                    <div class="form-row">
+                        <input type="text" @bind-value="update.Name" />
+                        <input type="number" @bind-value="update.Points" />
+                        <button class="btn btn-primary" @onclick="async () => await EditAnswer(answers.Answers[counter].Id)">Save</button>
+                        <button class="btn btn-secondary" @onclick="() => { edit = !edit; update = new UpdateAnswerCommand(); }">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (!edit && selectedId == counter && show && depth < 2)
+        {
+            <div style="margin: 20px;">
+                <Question answerId="answers.Answers[counter].Id" questionnaireId="questionnaireId" depth="@(depth+1)" />
+            </div>
+        }
+    }
+}
+@if (create)
+{
+    <div class="form-row">
+        <div class="col-md-4 mb-1">
+            <div class="form-row">
+                <input type="text" placeholder="answer" @bind="insert.Name" />
+                <input type="number" placeholder="points" @bind="insert.Points" />
+                <button class="btn btn-primary" @onclick="async () => await InsertAnswer()">Save</button>
+                <button class="btn btn-secondary" @onclick="() => { create = !create; }">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+else if (!edit)
+{
+    if (depth <= 2)
+    {
+        <button @onclick="() => { create = !create; }">Insert Answer</button>
+    }
+}
+
+@code {
+    [Parameter] public int questionnaireId { get; set; }
+    [Parameter] public int questionId { get; set; }
+    [Parameter] public int depth { get; set; }
+    AnswerListViewModel answers;
+    CreateAnswerCommand insert = new CreateAnswerCommand();
+    UpdateAnswerCommand update = new UpdateAnswerCommand();
+    bool edit, create, show;
+    int? selectedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await load();
+    }
+
+    protected async Task load()
+    {
+        answers = await answerService.GetAnswersAsync(questionId);
+    }
+
+    protected async Task InsertAnswer()
+    {
+        if (insert != null && !string.IsNullOrEmpty(insert.Name))
+        {
+            insert.QuestionId = questionId;
+            insert.QuestionnaireId = questionnaireId;
+
+            var id = await answerService.InsertAnswerAsync(insert);
+
+            insert = new CreateAnswerCommand();
+            create = false;
+
+            await load();
+        }
+    }
+
+    protected void LoadEditingData(int id)
+    {
+        var answer = answers.Answers.FirstOrDefault(e => e.Id == id);
+
+        if (answer != null)
+        {
+            update.Id = answer.Id;
+            update.Name = answer.Name;
+            update.Points = answer.Points;
+        }
+    }
+
+    protected async Task EditAnswer(int id)
+    {
+        if (update != null)
+        {
+            await answerService.UpdateAnswerAsync(update);
+
+            edit = false;
+            update = new UpdateAnswerCommand();
+
+            var answer = await answerService.GetAnswerAsync(id);
+
+            if (answer != null)
+            {
+                var index = answers.Answers.FindIndex(e => e.Id == id);
+                answers.Answers[index] = answer;
+                StateHasChanged();
+            }
+        }
+    }
+
+    protected async Task Delete(int id)
+    {
+        if (id != 0)
+        {
+            await answerService.DeleteAnswerAsync(id);
+
+            answers.Answers.Remove(answers.Answers.FirstOrDefault(e => e.Id == id));
+            StateHasChanged();
+        }
+    }
+}
