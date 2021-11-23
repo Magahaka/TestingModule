@@ -1,4 +1,6 @@
 ﻿using AutoMapper;
+using AutoMapper.QueryableExtensions;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +13,7 @@ using SportTracker.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SportTracker.Controllers
@@ -90,6 +93,105 @@ namespace SportTracker.Controllers
         {
 
             return Ok();
+        }
+    }
+
+    public class Create
+    {
+        public class Command : IRequest
+        {
+            public Answer Answer { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly AppDbContext _context;
+
+            public Handler(AppDbContext context)
+            {
+                _context = context;
+            }
+
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                Answer answer = request.Answer;
+
+                if (answer.QuestionId is null)
+                {
+                    answer.QuestionId = null;
+                }
+
+                if (answer.Name == null)
+                {
+                    throw new Exception("Answer must have name");
+                }
+                _context.Answers.Add(answer);
+                await _context.SaveChangesAsync();
+
+                return Unit.Value;
+            }
+        }
+    }
+
+    public class Edit
+    {
+        public class Command : IRequest
+        {
+            public Answer Answer { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly AppDbContext _context;
+
+            public Handler(AppDbContext context)
+            {
+                _context = context;
+            }
+
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                Answer answer = await _context.Answers.FindAsync(request.Answer.Id);
+
+                if (request.Answer.Name == null)
+                {
+                    throw new Exception("Answer must have a name");
+                }
+
+                answer.Name = request.Answer.Name;
+
+                await _context.SaveChangesAsync();
+
+                return Unit.Value;
+            }
+        }
+    }
+
+    public class List
+    {
+        public class Query : IRequest<List<AnswerViewModel>>
+        {
+        }
+
+        public class Handler : IRequestHandler<Query, List<AnswerViewModel>>
+        {
+            private readonly AppDbContext _context;
+            private readonly IMapper _mapper;
+
+            public Handler(AppDbContext context, IMapper mapper)
+            {
+                _context = context;
+                _mapper = mapper;
+            }
+
+            public async Task<List<AnswerViewModel>> Handle(Query request, CancellationToken cancellationToken)
+            {
+                var categories = await _context.Answers
+                    .ProjectTo<AnswerViewModel>(_mapper.ConfigurationProvider)
+                    .ToListAsync(cancellationToken);
+
+                return categories;
+            }
         }
     }
 }

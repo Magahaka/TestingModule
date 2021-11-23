@@ -23,6 +23,7 @@ using System.Threading.Tasks;
 using NETCore.MailKit.Extensions;
 using NETCore.MailKit.Infrastructure.Internal;
 using NETCore.MailKit.Core;
+using IdentityExample.Controllers;
 
 namespace SportTracker
 {
@@ -71,6 +72,7 @@ namespace SportTracker
             services.AddSingleton<SportPlanService>();
             services.AddSingleton<QuestionnaireService>();
             services.AddSingleton<QuestionService>();
+            services.AddScoped<TokenService>();
             services.AddSingleton<QuestionnaireQuestionService>();
             services.AddSingleton<AnswerService>();
             services.AddAutoMapper(typeof(Startup));

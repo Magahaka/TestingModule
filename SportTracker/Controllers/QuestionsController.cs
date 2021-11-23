@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ using SportTracker.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SportTracker.Controllers
@@ -168,6 +170,58 @@ namespace SportTracker.Controllers
             }
 
             return Ok();
+        }
+    }
+
+    public class CreateQuestion
+    {
+        public class Command : IRequest
+        {
+            public Question Question { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly AppDbContext _context;
+
+            public Handler(AppDbContext context)
+            {
+                _context = context;
+            }
+
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                if (string.IsNullOrWhiteSpace(request.Question.Name))
+                {
+                    throw new Exception("Question must have a name");
+                }
+
+                if (request.Question.Answers == null)
+                {
+                    throw new Exception("Question must have answers list");
+                }
+
+                if (request.Question.QuestionnaireQuestions == null)
+                {
+                    throw new Exception("Questionnaire questions must have answers list");
+                }
+
+                if (request.Question.Id == 0)
+                {
+                    throw new Exception("Question must have id");
+                }
+
+                if (request.Question.Depth < 1)
+                {
+                    throw new Exception("Question must have a positive depth level");
+                }
+
+                _context.Questions.Add(request.Question);
+
+                await _context.SaveChangesAsync();
+
+                return Unit.Value;
+            }
         }
     }
 }

@@ -7,5 +7,6 @@ namespace SportTracker.Areas.Identity.Data
     {
         public int? SportPlanId { get; set; }
         public SportPlan SportPlan { get; set; }
+        public string DisplayName { get; set; }
     }
 }

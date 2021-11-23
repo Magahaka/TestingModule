@@ -17,14 +17,14 @@ namespace SportTracker.Data
 
         }
 
-        public DbSet<Workout> Workouts { get; set; }
-        public DbSet<Questionnaire> Questionnaires { get; set; }
-        public DbSet<Question> Questions { get; set; }
-        public DbSet<Answer> Answers { get; set; }
-        public DbSet<QuestionnaireQuestion> QuestionnaireQuestions { get; set; }
-        public DbSet<AnswerQuestion> AnswerQuestions { get; set; }
-        public DbSet<SportPlan> SportPlans { get; set; }
-        public DbSet<PlanWorkout> PlanWorkouts { get; set; }
+        public virtual DbSet<Workout> Workouts { get; set; }
+        public virtual DbSet<Questionnaire> Questionnaires { get; set; }
+        public virtual DbSet<Question> Questions { get; set; }
+        public virtual DbSet<Answer> Answers { get; set; }
+        public virtual DbSet<QuestionnaireQuestion> QuestionnaireQuestions { get; set; }
+        public virtual DbSet<AnswerQuestion> AnswerQuestions { get; set; }
+        public virtual DbSet<SportPlan> SportPlans { get; set; }
+        public virtual DbSet<PlanWorkout> PlanWorkouts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

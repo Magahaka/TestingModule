@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ using SportTracker.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SportTracker.Controllers
@@ -112,6 +114,58 @@ namespace SportTracker.Controllers
             }
 
             return Ok();
+        }
+    }
+
+    public class CreateWorkout
+    {
+        public class Command : IRequest
+        {
+            public Workout Workout { get; set; }
+        }
+
+        public class Handler : IRequestHandler<Command>
+        {
+            private readonly AppDbContext _context;
+
+            public Handler(AppDbContext context)
+            {
+                _context = context;
+            }
+
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                if (string.IsNullOrWhiteSpace(request.Workout.Name))
+                {
+                    throw new Exception("Workout must have a name");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Workout.Description))
+                {
+                    throw new Exception("Workout must have a description");
+                }
+
+                if (request.Workout.StartDateTime == null)
+                {
+                    throw new Exception("Workout must have start date time");
+                }
+
+                if (request.Workout.EndDateTime == null)
+                {
+                    throw new Exception("Workout must have end date time");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Workout.UserId))
+                {
+                    throw new Exception("Workout must have user id");
+                }
+
+                _context.Workouts.Add(request.Workout);
+
+                await _context.SaveChangesAsync();
+
+                return Unit.Value;
+            }
         }
     }
 }
